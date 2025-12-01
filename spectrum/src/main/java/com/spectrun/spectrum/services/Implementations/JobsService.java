@@ -1,5 +1,4 @@
 package com.spectrun.spectrum.services.Implementations;
-
 import com.spectrun.spectrum.Enums.JobStatus;
 import com.spectrun.spectrum.models.Jobs;
 import com.spectrun.spectrum.repositories.JobsRepository;

@@ -35,18 +35,15 @@ public class UserService implements user {
 
     @Override
     public List<UserDTO> getUsers() {
-        List<UserDTO> userList = this.userRepsoitory.findAll().stream().map(subscriber -> UserMapper.INSTANCE.userToUserDto(subscriber)).collect(Collectors.toList());
-        return userList;
+        return this.userRepsoitory.findAll().stream().map(UserMapper.INSTANCE::userToUserDto).collect(Collectors.toList());
     }
 
     @Override
     public UserDTO getUser(long userId) {
         Users user = this.userRepsoitory.getReferenceById(userId);
-        if(user != null){
-             UserDTO activeUser = UserMapper.INSTANCE.userToUserDto(user);
-             return  activeUser;
-        }
-        return null;
+        return UserMapper.INSTANCE.userToUserDto(user);
+
+
     }
 
     @Override

@@ -53,7 +53,7 @@ public class host {
 
         Jobs job = this.jobsService.CreatePendingJob("init-host:" + host.getHostname());
         IssuedToken jobToken = tokenIssuer.issueForJob(job.getId(),Duration.from(ChronoUnit.HOURS.getDuration()),job.getIdempotencyKey());
-        initializeServerTemplate template = new initializeServerTemplate(host.getHostname(),host.getSshUsername(),host.getSshPassword(),jobToken.token(),job.getCallbackUrl(),job.getId());
+        initializeServerTemplate template = new initializeServerTemplate(host.getHostname(),host.getSshUsername(),host.getSshPassword(),jobToken.token(),job.getCallbackUrl(),job.getId(),job.getIdempotencyKey());
         this.intializeServer.send("initialize-server",template);
 
         return ResponseEntity.accepted()

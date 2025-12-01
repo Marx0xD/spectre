@@ -1,67 +1,28 @@
 package com.spectrun.spectrum.MessageTemplate;
 
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.io.Serializable;
 
 @AllArgsConstructor
 @NoArgsConstructor
+@Setter
+@Getter
 public class initializeServerTemplate implements Serializable {
     private String host;
     private String username;
     private  String password;
     private String token;
     private String callbackUrl;
+    @JsonProperty("JobId")
     private long JobId;
+    private String idempotencyKey;
 
-    public String getHost() {
-        return host;
-    }
 
-    public void setHost(String host) {
-        this.host = host;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getToken() {
-        return token;
-    }
-
-    public void setToken(String token) {
-        this.token = token;
-    }
-
-    public String getCallbackUrl() {
-        return callbackUrl;
-    }
-
-    public void setCallbackUrl(String callbackUrl) {
-        this.callbackUrl = callbackUrl;
-    }
-
-    public long getJobId() {
-        return JobId;
-    }
-
-    public void setJobId(long jobId) {
-        JobId = jobId;
-    }
 }
