@@ -58,7 +58,7 @@ public class jobsController {
             pd.setProperty("code", "JOB_NOT_FOUND");
             return ResponseEntity.status(404).body(pd);
         }
-        //callbackHs256Verifier.verifyClaims(token,job.getId(),idem);
+        callbackHs256Verifier.verifyClaims(token,job.getId(),idem);
         switch (in.getStatus()){
             case PENDING -> {
                 if(job.getStatus() == JobStatus.PENDING ){
