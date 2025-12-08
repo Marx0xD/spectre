@@ -39,6 +39,19 @@ Before running the platform, ensure the following tools are installed:
 - virtual machine machine running with a fedora-server host
 
 ---
+## 🔐 Sensitive Configuration Keys
+
+Before running the system, configure the following properties with your own values in  
+`spectrum/src/main/resources/application.properties`:
+- spring.datasource.url
+- spring.datasource.username
+- spring.datasource.password
+
+- spring.security.jwt.secret_key
+
+- security.callback.shared-secret
+
+- security.jwt.expiration-time
 
 ## ⚡ Quick Start
 
