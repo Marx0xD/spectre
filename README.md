@@ -1,4 +1,4 @@
-                                                                                                                                                                        # Odoo Instance Orchestration Platform
+# Odoo Instance Orchestration Platform
 
 The Odoo Instance Orchestration Platform automates the provisioning of isolated Odoo environments on remote hosts. It uses a distributed architecture consisting of a Spring Boot control plane, a Kafka message broker, and a Python-based Orchestrator responsible for executing provisioning tasks such as container creation, database initialization, and environment configuration.
 
