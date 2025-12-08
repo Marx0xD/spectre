@@ -36,7 +36,8 @@ Before running the platform, ensure the following tools are installed:
 - Java 17  
 - Python 3.10+  
 - Maven (or the included `mvnw`)  
-- Git  
+- Git
+- virtual machine machine running with a fedora-server host
 
 ---
 
@@ -47,4 +48,13 @@ Before running the platform, ensure the following tools are installed:
 ```bash
 git clone git@github.com:Marx0xD/spectre.git
 cd  spectrum/
+cd ..
+docker-compose up -d
+cd spectrum
+./mvnw spring-boot:run
+cd ../InstanceControllerService
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000
+
+
 
