@@ -2,6 +2,7 @@ package com.spectrun.spectrum.models;
 
 
 import com.spectrun.spectrum.Enums.JobStatus;
+import com.spectrun.spectrum.Enums.JobType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,10 +29,10 @@ public class Jobs {
     private  String message;
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
-
+    @Enumerated(EnumType.STRING)
+    private JobType type;
     @Column(nullable = false)
     private Instant updatedAt;
-
     @Version
     private long version;
 
