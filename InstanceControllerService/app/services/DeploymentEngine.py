@@ -7,6 +7,7 @@ from app.schema.ResponseSchema import failed_response, success_response
 from app.services.ConfigurationFileManager import ConfigurationFileManager
 from app.services.DeploymentEngineBase import DeploymentEngineBase
 from app.utils.PortManager import PortManager
+from app.utils.load_server_intialize_script import load_server_exec_script
 
 
 class RemoteDeploymentEngine(DeploymentEngineBase):
@@ -40,13 +41,20 @@ class RemoteDeploymentEngine(DeploymentEngineBase):
         server_init_response = DPInitializationResponseScheme()
         if not client:
             return failed_response(message="Authentication Error Check Your Credentials")
-        script_path = "/tmp/install_docker.sh"
-        sftp = client.open_sftp()
-        with sftp.file(script_path,"w") as f:
-            f.write(IntializationScript(self._username))
-        sftp.chmod(script_path, 0o755)
-        sftp.close()
-        stdin, stdout, stderr =client.exec_command(f"echo '{self._password}' | sudo -S bash {script_path}")
+
+        deployment_script = load_server_exec_script("fedora")
+        command = f"USERNAME={self._username} sudo -S -E bash -s"
+        stdin, stdout, stderr = client.exec_command(command)
+
+        # 1. Send sudo password
+        stdin.write(self._password + "\n")
+        stdin.flush()
+
+        # 2. Send the script
+        stdin.write(deployment_script)
+        stdin.flush()
+
+        stdin.channel.shutdown_write()
         ## properly analyze these responses for an optimal return
         print(stdout.read().decode())
         print(stderr.read().decode())
@@ -105,3 +113,4 @@ class RemoteDeploymentEngine(DeploymentEngineBase):
 
 # class LocalDeploymentEngine(DeploymentEngineBase):
 #     pass
+# will build a local instance deployer some day lol
