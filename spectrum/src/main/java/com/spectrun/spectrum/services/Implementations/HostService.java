@@ -11,10 +11,12 @@ import java.util.Optional;
 @Service
 public class HostService {
     private HostRepository hostRepository;
+    private final SymetricEncryptionService encryptionService;
 
 
-    public HostService(HostRepository hostRepository) {
+    public HostService(HostRepository hostRepository, SymetricEncryptionService encryptionService) {
         this.hostRepository = hostRepository;
+        this.encryptionService = encryptionService;
     }
 
     public HostDto hostToHostDto(Host host){
@@ -22,6 +24,8 @@ public class HostService {
     }
 
     public HostDto createHost(Host host){
+        String encryptedCred = this.encryptionService.symetricEncryptService(host.getSshPassword());
+        host.setSshPassword(encryptedCred);
         Host newHost = this.hostRepository.save(host);
         return  this.hostToHostDto(newHost);
     }
@@ -32,9 +36,10 @@ public class HostService {
     }
     public  HostDto updateHost(Long id,Host host){
       Optional <Host> targetHost = this.hostRepository.findById(id);
+      String encryptedCred = this.encryptionService.symetricEncryptService(host.getSshPassword());
       targetHost.map(hostToUpdate ->{
           hostToUpdate.setHostname(host.getHostname());
-          hostToUpdate.setSshPassword(host.getSshPassword());
+          hostToUpdate.setSshPassword(encryptedCred);
           hostToUpdate.setSshUsername(host.getSshUsername());
           return this.hostToHostDto( this.hostRepository.save(hostToUpdate));
 

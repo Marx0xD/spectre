@@ -115,14 +115,15 @@ public class ProbeController {
     @PostMapping("/")
     public ResponseEntity<?> probeHost(@RequestBody ProbeHostRequest probeData) {
 
-        String url = "/ping";
+        String url = "http://localhost:8000/proble/ping";
 
         try {
             String jsonBody = objectMapper.writeValueAsString(probeData);
-
+            System.out.println(jsonBody);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Content-Type", "application/json")
+                    .version(HttpClient.Version.HTTP_1_1)
                     .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                     .build();
 

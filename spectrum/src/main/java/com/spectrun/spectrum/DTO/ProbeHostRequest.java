@@ -4,7 +4,7 @@ import lombok.Data;
 
 @Data
 public class ProbeHostRequest {
-    private String hostname;     // user label
-    private String ipAddress;
+    private String host;     // user label
+    private String ssh_port;
 
 }
