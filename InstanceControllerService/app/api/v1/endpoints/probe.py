@@ -19,8 +19,9 @@ async def probe(probe_host: ProbeModel):
         return res
     res = Response.faild_response("failed to reach server")
     return res
-@router.get("/ping")
+@router.post("/ping")
 async def ssh_reachability(data:SSHReachabilityRequest):
+    print(data)
     system_inspector = SystemInspector(None)
     ssh_result = system_inspector.verify_ssh_reachable(host=data.host,port=data.ssh_port)
     return ssh_result

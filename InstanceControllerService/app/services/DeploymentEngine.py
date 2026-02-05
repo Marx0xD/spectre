@@ -1,3 +1,7 @@
+import logging
+import os
+from logging import exception
+
 from app.Scripts.InstallDocker import IntializationScript, startup_container
 import paramiko
 
@@ -6,9 +10,11 @@ from app.schema.DeploymentConfig import DPInitializationResponseScheme, Envirome
 from app.schema.ResponseSchema import failed_response, success_response
 from app.services.ConfigurationFileManager import ConfigurationFileManager
 from app.services.DeploymentEngineBase import DeploymentEngineBase
+from app.services.SymetricEncryptionService.decrypt_ssh_key import decrypt_ssh_password
 from app.utils.PortManager import PortManager
 from app.utils.load_server_intialize_script import load_server_exec_script
 
+logger = logging.getLogger("dep engine")
 
 class RemoteDeploymentEngine(DeploymentEngineBase):
     def __init__(self,username,password,host,idempotency_key):
@@ -37,8 +43,12 @@ class RemoteDeploymentEngine(DeploymentEngineBase):
     def get_ssh_client(self):
         return self.__connect_to_client()
     def initialize_server(self):
+        print("running service")
         client = self.__connect_to_client()
         server_init_response = DPInitializationResponseScheme()
+        master_secret = os.environ["SPECTRUM_SSH_MASTER_KEY"].encode("utf-8")
+        password =  decrypt_ssh_password(encrypted_ssh_key=self._password,master_secret=master_secret)
+
         if not client:
             return failed_response(message="Authentication Error Check Your Credentials")
 
@@ -47,7 +57,7 @@ class RemoteDeploymentEngine(DeploymentEngineBase):
         stdin, stdout, stderr = client.exec_command(command)
 
         # 1. Send sudo password
-        stdin.write(self._password + "\n")
+        stdin.write(password + "\n")
         stdin.flush()
 
         # 2. Send the script

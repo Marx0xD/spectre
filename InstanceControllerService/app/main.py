@@ -4,12 +4,16 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
 from app.KafkaManager.intializeHostListener import start_listeners, stop_listeners
-from app.api.v1.endpoints import test_container_creation
+from app.api.v1.endpoints import test_container_creation, probe
 
+from dotenv import load_dotenv
+import os
 
-
+load_dotenv()  # dev only
 #register routes later
 
+if "SPECTRUM_SSH_MASTER_KEY" not in os.environ:
+    raise RuntimeError("SPECTRUM_SSH_MASTER_KEY is not set")
 
 @asynccontextmanager
 async def lifespan(app:FastAPI):
@@ -22,5 +26,6 @@ async def lifespan(app:FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(test_container_creation.router)
+
+app.include_router(probe.router)
 

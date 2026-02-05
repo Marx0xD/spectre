@@ -100,7 +100,7 @@ async def consume_init_loop():
             logger.info("[init_host] val: %r", msg.value)
             try:
                 data = json.loads(msg.value)
-                print(data)
+                # print(data)
                 init_msg = InitializeHostMsg(**data)
 
 
