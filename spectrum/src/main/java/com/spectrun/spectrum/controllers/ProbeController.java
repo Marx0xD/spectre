@@ -1,6 +1,5 @@
 package com.spectrun.spectrum.controllers;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spectrun.spectrum.DTO.*;
 import com.spectrun.spectrum.Enums.HostInitStatus;
@@ -8,7 +7,6 @@ import com.spectrun.spectrum.models.Host;
 import com.spectrun.spectrum.services.Implementations.HostService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +23,7 @@ public class ProbeController {
     private final HttpClient httpClient;
     private final HostService hostService;
     private final ObjectMapper objectMapper;
+
     @Value("${app.publicBaseApiUrl}")
     private String orchestratorUrl;
 
@@ -39,9 +38,11 @@ public class ProbeController {
     }
 
     @PostMapping("/discovery")
-    public ResponseEntity<?> probeHost(@RequestBody HostDetailRequest probeData) {
+    public ResponseEntity<ApiResponse<HostDto>> probeHost(
+            @RequestBody HostDetailRequest probeData
+    ) {
 
-        String url = ""; // python probe endpoint
+        String url = orchestratorUrl + "/probe/discovery";
 
         try {
             String jsonBody = objectMapper.writeValueAsString(probeData);
@@ -56,11 +57,11 @@ public class ProbeController {
                     httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.BAD_GATEWAY);
-                pd.setTitle("Host probe failed");
-                pd.setDetail(response.body());
-                pd.setProperty("code", "PROBE_FAILED");
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(pd);
+                return ResponseEntity
+                        .status(HttpStatus.BAD_GATEWAY)
+                        .body(ApiResponse.error(
+                                "Host probe failed"
+                        ));
             }
 
             ProbeHostResponse probeResult =
@@ -79,47 +80,41 @@ public class ProbeController {
 
             HostDto saved = hostService.createHost(host);
 
-            HostDto dto = new HostDto();
-            dto.setId(saved.getId());
-            dto.setHostname(saved.getHostname());
-            dto.setHostIp(saved.getHostIp());
-            dto.setOsFamily(saved.getOsFamily());
-            dto.setOsVersion(saved.getOsVersion());
-            dto.setArchitecture(saved.getArchitecture());
-            dto.setStatus(saved.getStatus());
-            dto.setRegisteredAt(saved.getRegisteredAt());
-            dto.setUpdatedOn(saved.getUpdatedOn());
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(ApiResponse.success(
+                            "Host probed and registered",
+                            saved
+                    ));
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
 
-            ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
-            pd.setTitle("Probe interrupted");
-            pd.setDetail("Probe operation was interrupted");
-            pd.setProperty("code", "PROBE_INTERRUPTED");
-
-            return ResponseEntity.internalServerError().body(pd);
+            return ResponseEntity
+                    .internalServerError()
+                    .body(ApiResponse.error(
+                            "Probe operation was interrupted"
+                    ));
 
         } catch (IOException e) {
-            ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.BAD_GATEWAY);
-            pd.setTitle("Probe communication error");
-            pd.setDetail(e.getMessage());
-            pd.setProperty("code", "PROBE_IO_ERROR");
-
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(pd);
+            return ResponseEntity
+                    .status(HttpStatus.BAD_GATEWAY)
+                    .body(ApiResponse.error(
+                            "Probe communication error"
+                    ));
         }
     }
 
-    @PostMapping("/")
-    public ResponseEntity<?> probeHost(@RequestBody ProbeHostRequest probeData) {
+    @PostMapping("/ping")
+    public ResponseEntity<ApiResponse<ProbeRequestResult>> probePing(
+            @RequestBody ProbeHostRequest probeData
+    ) {
 
-        String url = "http://localhost:8000/proble/ping";
+        String url = "http://localhost:8000/probe/ping";
 
         try {
             String jsonBody = objectMapper.writeValueAsString(probeData);
-            System.out.println(jsonBody);
+
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Content-Type", "application/json")
@@ -130,37 +125,39 @@ public class ProbeController {
             HttpResponse<String> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-            // Python service failed → control-plane failure
             if (response.statusCode() != 200) {
-                ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.BAD_GATEWAY);
-                pd.setTitle("Host probe backend error");
-                pd.setDetail(response.body());
-                pd.setProperty("code", "PROBE_BACKEND_ERROR");
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(pd);
+                return ResponseEntity
+                        .status(HttpStatus.BAD_GATEWAY)
+                        .body(ApiResponse.error(
+                                "Probe backend error"
+                        ));
             }
 
-            // Python responded correctly → deserialize probe result
             ProbeRequestResult result =
                     objectMapper.readValue(response.body(), ProbeRequestResult.class);
 
-
-            return ResponseEntity.ok(result);
+            return ResponseEntity.ok(
+                    ApiResponse.success(
+                            "Probe successful",
+                            result
+                    )
+            );
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
 
-            ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.BAD_GATEWAY);
-            pd.setTitle("Probe interrupted");
-            pd.setDetail("Probe operation was interrupted");
-            pd.setProperty("code", "PROBE_INTERRUPTED");
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(pd);
+            return ResponseEntity
+                    .status(HttpStatus.BAD_GATEWAY)
+                    .body(ApiResponse.error(
+                            "Probe operation interrupted"
+                    ));
 
         } catch (IOException e) {
-            ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.BAD_GATEWAY);
-            pd.setTitle("Probe communication failure");
-            pd.setDetail(e.getMessage());
-            pd.setProperty("code", "PROBE_IO_ERROR");
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(pd);
+            return ResponseEntity
+                    .status(HttpStatus.BAD_GATEWAY)
+                    .body(ApiResponse.error(
+                            "Probe communication failure"
+                    ));
         }
     }
 }

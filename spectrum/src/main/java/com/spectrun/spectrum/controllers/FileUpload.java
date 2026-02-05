@@ -1,5 +1,6 @@
 package com.spectrun.spectrum.controllers;
 
+import com.spectrun.spectrum.DTO.ApiResponse;
 import com.spectrun.spectrum.DTO.ModuleDto;
 import com.spectrun.spectrum.services.Implementations.ModuleService;
 import com.spectrun.spectrum.services.StorageService;
@@ -25,17 +26,27 @@ private final ModuleService moduleService;
 
 
     @PostMapping("/new")
-    ResponseEntity<?> uploadModule(@RequestParam("file") MultipartFile file
+    ResponseEntity<ApiResponse<String>> uploadModule(@RequestParam("file") MultipartFile file
                                    ){
         String filePath = storageService.store(file);
         HashMap<String,String> filePathResponse = new HashMap<String,String>();
         filePathResponse.put("path",filePath);
-        return new ResponseEntity<>(filePathResponse,HttpStatus.OK);
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(ApiResponse.success(
+                        "Module file uploaded",
+                        filePath
+                ));
     }
     @PostMapping("/newModule")
-    ResponseEntity<?> uploadModule(@RequestBody ModuleDto module){
+    ResponseEntity<ApiResponse<ModuleDto>>  uploadModule(@RequestBody ModuleDto module){
         ModuleDto newModule = this.moduleService.addNewmodule(module);
-        return new ResponseEntity<>(newModule,HttpStatus.OK);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success(
+                        "Module created",
+                        newModule
+                ));
     }
 
 }

@@ -11,7 +11,6 @@ import com.spectrun.spectrum.services.Implementations.ModuleService;
 import com.spectrun.spectrum.services.Implementations.UserService;
 import com.spectrun.spectrum.utils.API.Request;
 import com.spectrun.spectrum.utils.API.RequestDTO.InstallModuleDto;
-import com.spectrun.spectrum.utils.API.ResponseBody.ResponseBody;
 import com.spectrun.spectrum.utils.API.ResponseDTO.moduleInstallResponseDTO;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,133 +25,153 @@ import java.util.logging.Logger;
 import static com.spectrun.spectrum.utils.URLParser.getPortFromAddress;
 
 @RestController
-@RequestMapping("/api/v1/Instances")
+@RequestMapping("/api/v1/instances")
 @Deprecated
 public class InstanceController {
-    private InstanceService instanceService;
-    private ModuleService moduleService;
-    private UserService userService;
-    Logger logger = Logger.getLogger(InstanceController.class.getName());
-    private KafkaTemplate<String, createInstanceTemplate> createInstance;
-    public InstanceController(ModuleService moduleService,InstanceService instanceService,KafkaTemplate<String, createInstanceTemplate> createInstanceTemplate,UserService userService) {
+
+    private final InstanceService instanceService;
+    private final ModuleService moduleService;
+    private final UserService userService;
+    private final KafkaTemplate<String, createInstanceTemplate> createInstance;
+
+    private final Logger logger = Logger.getLogger(InstanceController.class.getName());
+
+    public InstanceController(
+            ModuleService moduleService,
+            InstanceService instanceService,
+            KafkaTemplate<String, createInstanceTemplate> createInstanceTemplate,
+            UserService userService
+    ) {
         this.instanceService = instanceService;
-        this .createInstance = createInstanceTemplate;
+        this.createInstance = createInstanceTemplate;
         this.userService = userService;
         this.moduleService = moduleService;
     }
 
-
-    @PostMapping("/create/instance")
-    public ResponseEntity<?> createNewInstance(@RequestBody InstanceModuleDto installationData){
-        String InstanceName = installationData.getInstallationInstance().getInstanceName();
-        ModuleDto installationModule = installationData.getInstallationModule();
-        //get the user from context
+    // legacy create + enqueue
+    @PostMapping("/create")
+    public ResponseEntity<ApiResponse<InstanceDto>> createNewInstance(
+            @RequestBody InstanceModuleDto installationData
+    ) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String username = auth.getName();
-        UserDTO subscriptionUser = this.userService.getUserByEmail(username);
-        if(subscriptionUser != null){
-            logger.info("No Subs User");
-                Subscriptions subscription = subscriptionUser.getSubscription();
+        UserDTO user = userService.getUserByEmail(auth.getName());
 
-            if(subscription != null){
-                logger.info(" Subs Found");
-                long limit = subscriptionUser.getSubscription().getUsageLimits().getInstanceLimit();
-                List<Instances> userInstances = subscriptionUser.getInstances();
-                String active = String.valueOf(Status.Active);
-                long activeUserInstances = userInstances.stream()
-                        .filter(x-> String.valueOf(x.getStatus()).equals(active))
-                        .count();
-                if(limit > activeUserInstances){
-                    //todo:create instances
-                    //todo: remove this logic and depricate this endpoint
-                    createInstanceTemplate template = new createInstanceTemplate(InstanceName,installationModule.getModuleName(),installationModule.getModulePath());
-                    this.createInstance.send("create_instance",template);
-                }
-                else{
-                    return new ResponseEntity<>(
-                            "Reached Instance Limit for Your Subscribtion. Either Remove Instances Or Upgrade Plan",
-                            HttpStatus.BAD_REQUEST);
-                }
-            }else{
-                return new ResponseEntity<>(
-                        "No Subs",
-                        HttpStatus.BAD_REQUEST);
-            }
+        if (user == null || user.getSubscription() == null) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(ApiResponse.error("No active subscription found"));
         }
-        else{
-            return  null;
+
+        Subscriptions subscription = user.getSubscription();
+        long limit = subscription.getUsageLimits().getInstanceLimit();
+
+        long activeInstances = user.getInstances().stream()
+                .filter(i -> i.getStatus() == Status.Active)
+                .count();
+
+        if (activeInstances >= limit) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(ApiResponse.error(
+                            "Instance limit reached for current subscription"
+                    ));
         }
-        // todo:
-        // 1 create the instance service, save only by name
-        InstanceDto newInstance = InstanceDto.builder()
-                .instanceName(InstanceName)
+
+        createInstanceTemplate template = new createInstanceTemplate(
+                installationData.getInstallationInstance().getInstanceName(),
+                installationData.getInstallationModule().getModuleName(),
+                installationData.getInstallationModule().getModulePath()
+        );
+
+        createInstance.send("create_instance", template);
+
+        InstanceDto instance = InstanceDto.builder()
+                .instanceName(installationData.getInstallationInstance().getInstanceName())
                 .status(Status.Pending)
-                .userId(subscriptionUser.getId())
+                .userId(user.getId())
                 .build();
-        InstanceDto instanceResponse = this.instanceService.createNewInstance(newInstance);
 
+        InstanceDto created = instanceService.createNewInstance(instance);
 
-        return new ResponseEntity<>("Ok", HttpStatus.OK);
+        return ResponseEntity
+                .accepted()
+                .body(ApiResponse.success(
+                        "Instance creation queued",
+                        created
+                ));
     }
-    @GetMapping("/get/Instances")
-    public ResponseEntity<List<InstanceDto>> getAllInstances(){
-        //get all user instances
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String username = auth.getName();
-        UserDTO subscriptionUser = this.userService.getUserByEmail(username);
 
-        List<InstanceDto> allInstances = this.instanceService.getAllInstances();
-        return new ResponseEntity<>(allInstances,HttpStatus.OK);
+    @GetMapping
+    public ApiResponse<List<InstanceDto>> getAllInstances() {
+        return ApiResponse.success(
+                "Instances fetched",
+                instanceService.getAllInstances()
+        );
     }
-    @GetMapping("/get/instances/user")
-    public  ResponseEntity<List<InstanceDto>> getUserInstances(@RequestParam long id){
-       List<InstanceDto>  userInstances = this.instanceService.getAllUserInstances(id);
-       return new ResponseEntity<>(userInstances,HttpStatus.OK);
+
+    @GetMapping("/user/{id}")
+    public ApiResponse<List<InstanceDto>> getUserInstances(
+            @PathVariable long id
+    ) {
+        return ApiResponse.success(
+                "User instances fetched",
+                instanceService.getAllUserInstances(id)
+        );
     }
 
     @PutMapping("/install/{moduleId}/{instanceId}")
-    public ResponseEntity <?>InstallModuleToInstance(@PathVariable int moduleId , int instanceId) throws Exception {
-        ModuleDto moduleDto = this.moduleService.getModuleById(moduleId);
-        InstanceDto instance = this.instanceService.getInstanceById(instanceId);
-        String host = "127.0.0.1";
-        InstallModuleDto moduleInfo = new InstallModuleDto();
-        moduleInfo.setDb(instance.getInstancedbName());
-        moduleInfo.setHost(host);
-        moduleInfo.setUser(instance.getAdminUserName());
-        moduleInfo.setPassword(instance.getAdminPassword());
-        moduleInfo.setModule(moduleDto.getModuleName());
-        String  port = getPortFromAddress(instance.getInstanceaddress());
-        moduleInfo.setPort(port);
-//        if(instance.getStatus().equals(Status.Active)){
-//            moduleInfo.setIsActive(true);
-//            Request<InstallModuleDto, moduleInstallResponseDTO> request = new Request<>();
-//            com.spectrun.spectrum.utils.API.ResponseBody.ResponseBody<moduleInstallResponseDTO> response = request.handleApiCall(moduleInfo,"http://127.0.0.1:5050/api/v1/containerManager/install/running",new TypeReference<ResponseBody<moduleInstallResponseDTO>>() {});
-//            return new ResponseEntity<>(response,HttpStatus.OK);
-//        }
+    public ResponseEntity<ApiResponse<moduleInstallResponseDTO>> installModule(
+            @PathVariable int moduleId,
+            @PathVariable int instanceId
+    ) throws Exception {
+
+        ModuleDto module = moduleService.getModuleById(moduleId);
+        InstanceDto instance = instanceService.getInstanceById(instanceId);
+
+        InstallModuleDto payload = new InstallModuleDto();
+        payload.setDb(instance.getInstancedbName());
+        payload.setHost("127.0.0.1");
+        payload.setUser(instance.getAdminUserName());
+        payload.setPassword(instance.getAdminPassword());
+        payload.setModule(module.getModuleName());
+        payload.setPort(getPortFromAddress(instance.getInstanceaddress()));
+
         Request<InstallModuleDto, moduleInstallResponseDTO> request = new Request<>();
-        com.spectrun.spectrum.utils.API.ResponseBody.ResponseBody<moduleInstallResponseDTO> response = request.handleApiCall(moduleInfo,"http://127.0.0.1:5050/api/v1/containerManager/installModule",new TypeReference<ResponseBody<moduleInstallResponseDTO>>() {});
-        return new ResponseEntity<>(response,HttpStatus.OK);
+
+        moduleInstallResponseDTO response =
+                request.handleApiCall(
+                        payload,
+                        "http://127.0.0.1:5050/api/v1/containerManager/installModule",
+                        new TypeReference<
+                                com.spectrun.spectrum.utils.API.ResponseBody.ResponseBody<
+                                        moduleInstallResponseDTO>>() {}
+                ).getData();
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Module installation triggered",
+                        response
+                )
+        );
     }
 
-    @GetMapping("/install/running")
-    public ResponseEntity<?>installToRunningModule(@RequestParam Long id) throws  Exception{
-        InstanceDto runningInstance = this.instanceService.getInstanceById(id);
-        if(runningInstance != null){
-             logger.info("Active instance \n"+runningInstance.toString());
-
-            return  new ResponseEntity<InstanceDto>(runningInstance,HttpStatus.NOT_FOUND);
-        }
-        return  new ResponseEntity<>(HttpStatus.NOT_FOUND);
-    }
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<InstanceDto>> getByStatus(@PathVariable Status status){
-        return ResponseEntity.ok(instanceService.getInstanceByStatus(status));
-    }
-    @GetMapping("/instance/{id}")
-    public ResponseEntity<Boolean> deleteInstanceById(@PathVariable long id){
-        Boolean result  = this.instanceService.deleteInstanceById(id);
-        return  ResponseEntity.ok(result);
+    public ApiResponse<List<InstanceDto>> getByStatus(
+            @PathVariable Status status
+    ) {
+        return ApiResponse.success(
+                "Instances fetched by status",
+                instanceService.getInstanceByStatus(status)
+        );
     }
 
-
+    @DeleteMapping("/{id}")
+    public ApiResponse<Boolean> deleteInstance(
+            @PathVariable long id
+    ) {
+        return ApiResponse.success(
+                "Instance deleted",
+                instanceService.deleteInstanceById(id)
+        );
+    }
 }

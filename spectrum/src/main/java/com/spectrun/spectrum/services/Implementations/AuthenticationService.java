@@ -22,10 +22,10 @@ public class AuthenticationService {
         this.authenticationManager = authenticationManager;
     }
 
-    public Users registerUser(UserDTO newUser) {
+    public UserDTO registerUser(UserDTO newUser) {
         Users mappedUser = UserMapper.INSTANCE.userDtoToUser(newUser);
         mappedUser.setPassword(passwordEncoder.encode(newUser.getPassword()));
-        return  userRepsoitory.save(mappedUser);
+        return  UserMapper.INSTANCE.userToUserDto(userRepsoitory.save(mappedUser));
 
     }
 
